@@ -9,13 +9,17 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.URLEncoder
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class GeminiBrain(private val context: Context) {
-
     private val client = OkHttpClient.Builder()
-        .connectTimeout(18, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(18, TimeUnit.SECONDS)
+        .writeTimeout(5, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false)
         .build()
 
     private fun getApiKey(): String = context.getSharedPreferences("cyberdon", Context.MODE_PRIVATE)
@@ -24,89 +28,89 @@ class GeminiBrain(private val context: Context) {
     private val endpointBase = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key="
 
     suspend fun askCyberDon(userQuery: String, history: List<Pair<String, String>>): Pair<List<ActionItem>, String> = withContext(Dispatchers.IO) {
+        val key = getApiKey()
+        if (key.isBlank()) return@withContext localFallback(userQuery, "Gemini key phone settings mein save nahi hai.")
         try {
-            val contentsArray = JSONArray()
-
-            // Attach recent conversation turns
-            for (turn in history.takeLast(6)) {
-                contentsArray.put(JSONObject().apply {
-                    put("role", "user")
-                    put("parts", JSONArray().put(JSONObject().put("text", turn.first)))
-                })
-                contentsArray.put(JSONObject().apply {
-                    put("role", "model")
-                    put("parts", JSONArray().put(JSONObject().put("text", turn.second)))
-                })
+            val contents = JSONArray()
+            history.takeLast(6).forEach { (user, assistant) ->
+                contents.put(turn("user", user)); contents.put(turn("model", assistant))
             }
-
-            // Current query
-            contentsArray.put(JSONObject().apply {
-                put("role", "user")
-                put("parts", JSONArray().put(JSONObject().put("text", userQuery)))
-            })
-
-            val systemInstruction = """You are CyberDon, an ultra-smart Jarvis-level voice assistant for Ali.
-Boss Name: Ali. Always address him respectfully.
-Available Actions:
-- OPEN_APP (target: freefire, snapchat, youtube, whatsapp, camera, gallery, settings, instagram, chrome)
-- CLOSE_APP (target: null)
-- SPLIT_SCREEN (target: null)
-- YOUTUBE_SEARCH (target: query)
-- BATTERY_STATUS (target: null)
-- VIBRATE (target: seconds)
-
-CRITICAL RULES:
-1. NO VISION: You cannot see inside photos or camera feed. Honestly tell Ali: "Ali bhai, mere paas photo ya screen dekhne ka camera sensor nahi hai."
-2. FORMAT: Return STRICT RAW JSON only:
-{
-  "actions": [{"action": "ACTION_NAME"|null, "target": string|null}],
-  "speech": "What CyberDon says aloud to Ali in natural Hindi"
-}
-""".trimIndent()
-
+            contents.put(turn("user", userQuery))
+            val system = """You are CyberDon, Ali's Hindi/Hinglish Android voice assistant. Interpret Hindi, Hinglish, English and common speech-recognition errors. Do not claim an action succeeded until the app verifies it. Never claim to see camera/video/photos or read private messages. Screen reading is permitted only from visible accessibility text. Only use the listed actions, max 4 actions, in the order needed. For non-device questions, answer directly and return actions []. If unsure, ask a short clarification.
+Available actions: OPEN_APP target package/app name; CLOSE_APP target null; GO_HOME target null; SPLIT_SCREEN target null; YOUTUBE_SEARCH target query; BATTERY_STATUS target null; VIBRATE target null; SWIPE_UP target null; SWIPE_DOWN target null; READ_SCREEN target null.
+Return raw JSON only: {"actions":[{"action":"OPEN_APP","target":"youtube"}],"speech":"Hindi answer"}.""".trimIndent()
             val payload = JSONObject().apply {
-                put("contents", contentsArray)
-                put("systemInstruction", JSONObject().apply {
-                    put("parts", JSONArray().put(JSONObject().put("text", systemInstruction)))
-                })
-                put("generationConfig", JSONObject().apply {
-                    put("temperature", 0.1)
-                    put("maxOutputTokens", 300)
-                })
+                put("contents", contents)
+                put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+                put("generationConfig", JSONObject().put("temperature", 0.2).put("maxOutputTokens", 300).put("responseMimeType", "application/json"))
             }
-
-            val apiKey = getApiKey()
-            if (apiKey.isBlank()) return@withContext Pair(emptyList(), "Pehle CyberDon settings mein apni Gemini API key save karein.")
-            val body = payload.toString().toRequestBody("application/json".toMediaType())
-            val request = Request.Builder().url(endpointBase + java.net.URLEncoder.encode(apiKey, "UTF-8")).post(body).build()
-
-            val response = client.newCall(request).execute()
-            val resStr = response.body?.string() ?: ""
-            val json = JSONObject(resStr)
-            val raw = json.getJSONArray("candidates")
-                .getJSONObject(0)
-                .getJSONObject("content")
-                .getJSONArray("parts")
-                .getJSONObject(0)
-                .getString("text")
-
-            val cleanJson = raw.substringAfter("{").substringBeforeLast("}")
-            val parsed = JSONObject("{$cleanJson}")
-
-            val actions = mutableListOf<ActionItem>()
-            val actionsArr = parsed.optJSONArray("actions")
-            if (actionsArr != null) {
-                for (i in 0 until actionsArr.length()) {
-                    val item = actionsArr.getJSONObject(i)
-                    actions.add(ActionItem(item.optString("action"), item.optString("target", null)))
+            val request = Request.Builder()
+                .url(endpointBase + URLEncoder.encode(key, "UTF-8"))
+                .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            client.newCall(request).execute().use { response ->
+                val text = response.body?.string().orEmpty()
+                if (!response.isSuccessful) return@withContext localFallback(userQuery, providerError(response.code))
+                val root = JSONObject(text)
+                val raw = root.optJSONArray("candidates")?.optJSONObject(0)?.optJSONObject("content")
+                    ?.optJSONArray("parts")?.optJSONObject(0)?.optString("text").orEmpty()
+                if (raw.isBlank()) return@withContext localFallback(userQuery, "AI ne khaali jawab diya; basic offline command try kar sakte hain.")
+                val parsed = parseJson(raw) ?: return@withContext localFallback(userQuery, "AI ka response samajh nahi aaya; basic offline command try karein.")
+                val actions = mutableListOf<ActionItem>()
+                parsed.optJSONArray("actions")?.let { array ->
+                    for (i in 0 until minOf(array.length(), 4)) {
+                        val item = array.optJSONObject(i) ?: continue
+                        actions.add(ActionItem(item.optString("action"), item.optString("target").takeUnless { it == "null" || it.isBlank() }))
+                    }
                 }
+                Pair(actions, parsed.optString("speech").ifBlank { "Ji Ali bhai." })
             }
-
-            val speech = parsed.optString("speech", "Ji Ali bhai.")
-            Pair(actions, speech)
         } catch (e: Exception) {
-            Pair(emptyList(), "Ali bhai, network connectivity check karein.")
+            localFallback(userQuery, when (e) {
+                is java.net.UnknownHostException -> "Internet unavailable hai. Basic phone commands offline try kar sakta hoon."
+                is java.net.SocketTimeoutException -> "AI response abhi slow hai. Basic phone command offline try kar sakta hoon."
+                else -> "AI service abhi nahi mili. Basic phone commands offline try kar sakta hoon."
+            })
         }
+    }
+
+    private fun turn(role: String, text: String) = JSONObject().put("role", role).put("parts", JSONArray().put(JSONObject().put("text", text)))
+
+    private fun parseJson(text: String): JSONObject? {
+        return try { JSONObject(text.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()) }
+        catch (_: Exception) {
+            val a = text.indexOf('{'); val b = text.lastIndexOf('}')
+            if (a >= 0 && b > a) try { JSONObject(text.substring(a, b + 1)) } catch (_: Exception) { null } else null
+        }
+    }
+
+    private fun providerError(code: Int): String = when (code) {
+        401, 403 -> "Gemini API key rejected ($code). Settings mein key check karein. Basic offline commands available hain."
+        404 -> "Gemini model ya endpoint nahi mila (404). Basic offline commands available hain."
+        429 -> "Gemini ki request limit poori hui (429). Thodi der baad try karein; basic commands chalenge."
+        in 500..599 -> "Gemini service abhi busy hai ($code). Basic commands offline try karein."
+        else -> "Gemini request failed ($code). Basic commands offline try karein."
+    }
+
+    private fun localFallback(query: String, reason: String): Pair<List<ActionItem>, String> {
+        val q = query.lowercase(Locale.ROOT)
+        val actions = mutableListOf<ActionItem>()
+        val apps = listOf("youtube", "whatsapp", "instagram", "snapchat", "chrome", "camera", "gallery", "settings", "termux", "free fire", "freefire")
+        val app = apps.firstOrNull { q.contains(it) }
+        val hasOpen = listOf("open", "kholo", "khol", "chalao", "launch").any { q.contains(it) }
+        if (app != null && hasOpen) actions.add(ActionItem("OPEN_APP", app.replace(" ", "")))
+        if (q.contains("youtube") && listOf("search", "dhundo", "dhoondo", "play").any { q.contains(it) }) {
+            val queryPart = query.substringAfter("search", "").substringAfter("dhundo", "").substringAfter("dhoondo", "").trim()
+            if (queryPart.isNotBlank()) actions.add(ActionItem("YOUTUBE_SEARCH", queryPart))
+        }
+        if (listOf("battery", "बैटरी", "charge", "चार्ज").any { q.contains(it) }) actions.add(ActionItem("BATTERY_STATUS", null))
+        if (listOf("vibrate", "vibration", "kampan", "vibrate karo", "वाइब्रेट").any { q.contains(it) }) actions.add(ActionItem("VIBRATE", null))
+        if (listOf("screen par kya", "screen read", "screen pe kya", "padh ke", "read screen").any { q.contains(it) }) actions.add(ActionItem("READ_SCREEN", null))
+        if (listOf("scroll down", "neeche scroll", "neeche karo", "swipe up").any { q.contains(it) }) actions.add(ActionItem("SWIPE_UP", null))
+        if (listOf("scroll up", "upar scroll", "upar karo", "swipe down").any { q.contains(it) }) actions.add(ActionItem("SWIPE_DOWN", null))
+        if (q.contains("home") || q.contains("home screen")) actions.add(ActionItem("GO_HOME", null))
+        val speech = if (actions.isNotEmpty()) "Internet nahi chal raha, main basic command offline try kar raha hoon." else "$reason Main offline jawab yaad se nahi banaunga, kyunki galat baat keh sakta hoon. Network theek hone par sawal dobara boliye."
+        return Pair(actions, speech)
     }
 }
 

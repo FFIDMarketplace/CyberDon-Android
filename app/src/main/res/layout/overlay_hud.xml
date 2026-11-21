@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/hud_overlay_root"
+    android:layout_width="280dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/bg_hud_overlay">
+
+    <TextView
+        android:id="@+id/tv_hud_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CYBERDON // ONLINE"
+        android:textColor="#00F5FF"
+        android:textSize="11sp"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="12dp" />
+
+    <ProgressBar
+        android:id="@+id/progress_hud"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:progressTint="#00F5FF"
+        android:progressBackgroundTint="#21262D"
+        android:indeterminate="true"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tv_hud_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ali bhai, command boliye."
+        android:textColor="#F2F4F7"
+        android:textSize="14sp"
+        android:lineSpacingMultiplier="1.1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_marginTop="12dp">
+
+        <TextView
+            android:id="@+id/tv_hud_listen"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:gravity="center"
+            android:text="🎙 LISTEN"
+            android:textColor="#00F5FF"
+            android:textSize="12sp"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/tv_hud_close"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:paddingLeft="12dp"
+            android:paddingRight="12dp"
+            android:gravity="center"
+            android:text="CLOSE"
+            android:textColor="#FF6B6B"
+            android:textSize="12sp"
+            android:clickable="true"
+            android:focusable="true" />
+    </LinearLayout>
+</LinearLayout>

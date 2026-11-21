@@ -105,7 +105,7 @@
             android:id="@+id/btnSpeakNow"
             android:layout_width="match_parent"
             android:layout_height="64dp"
-            android:text="🎙️ Tap to Speak to CyberDon"
+            android:text="🎙️ Start hands-free voice session"
             android:textSize="18sp"
             app:cornerRadius="16dp"
             android:backgroundTint="#38BDF8"

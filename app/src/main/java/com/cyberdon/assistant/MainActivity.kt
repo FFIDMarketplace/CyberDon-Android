@@ -19,6 +19,9 @@ import java.util.Locale
 
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
+    companion object { const val ACTION_OVERLAY_LISTEN = "com.cyberdon.assistant.OVERLAY_LISTEN" }
+
+
     private lateinit var binding: ActivityMainBinding
     private lateinit var geminiBrain: GeminiBrain
     private var tts: TextToSpeech? = null
@@ -58,7 +61,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun checkPermissions() {
         val isAccessibilityEnabled = CyberDonAccessibilityService.instance != null
         binding.tvAccessibilityStatus.text = if (isAccessibilityEnabled) {
-            "Accessibility: ACTIVE (Full Control Enabled)"
+            "Accessibility: ACTIVE (user-approved actions)"
         } else {
             "Accessibility: NOT ENABLED (Tap below to activate)"
         }
@@ -103,9 +106,31 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
         }
 
-        binding.btnSpeakNow.setOnClickListener {
-            startListening()
+        binding.btnSpeakNow.setOnClickListener { startVoiceSession() }
+    }
+
+
+    private fun startVoiceSession() {
+        val permissions = mutableListOf(android.Manifest.permission.RECORD_AUDIO)
+        if (android.os.Build.VERSION.SDK_INT >= 33) permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
+        val missing = permissions.filter { androidx.core.content.ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) {
+            androidx.core.app.ActivityCompat.requestPermissions(this, missing.toTypedArray(), 141)
+            return
         }
+        try {
+            val intent = Intent(this, CyberDonSessionService::class.java).setAction(CyberDonSessionService.ACTION_START)
+            androidx.core.content.ContextCompat.startForegroundService(this, intent)
+            binding.tvOutput.text = "CyberDon session shuru ho rahi hai. Mic ke liye foreground notification dikhega."
+        } catch (e: Exception) {
+            binding.tvOutput.text = "Voice session start nahi hui: ${e.localizedMessage ?: "Android permission check karein"}"
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 141 && grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) startVoiceSession()
+        else if (requestCode == 141) binding.tvOutput.text = "Microphone permission ke bina voice session nahi chalegi."
     }
 
     private fun startListening() {

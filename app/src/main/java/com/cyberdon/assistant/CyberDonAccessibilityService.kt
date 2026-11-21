@@ -26,16 +26,35 @@ class CyberDonAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
-    fun goHome() {
-        performGlobalAction(GLOBAL_ACTION_HOME)
+    fun goHome(): Boolean = performGlobalAction(GLOBAL_ACTION_HOME)
+
+    fun goBack(): Boolean = performGlobalAction(GLOBAL_ACTION_BACK)
+
+    fun toggleSplitScreen(): Boolean = performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
+
+    fun swipe(direction: String): Boolean {
+        val metrics = resources.displayMetrics
+        val x = metrics.widthPixels / 2f
+        val startY = when (direction) { "up" -> metrics.heightPixels * 0.78f; else -> metrics.heightPixels * 0.25f }
+        val endY = when (direction) { "up" -> metrics.heightPixels * 0.25f; else -> metrics.heightPixels * 0.78f }
+        val path = Path().apply { moveTo(x, startY); lineTo(x, endY) }
+        val gesture = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 420)).build()
+        return dispatchGesture(gesture, null, null)
     }
 
-    fun goBack() {
-        performGlobalAction(GLOBAL_ACTION_BACK)
-    }
+    fun foregroundPackageName(): String? = rootInActiveWindow?.packageName?.toString()
 
-    fun toggleSplitScreen() {
-        performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
+    fun readVisibleText(): String {
+        val root = rootInActiveWindow ?: return ""
+        val found = mutableListOf<String>()
+        fun walk(node: android.view.accessibility.AccessibilityNodeInfo?) {
+            if (node == null || found.size >= 80) return
+            node.text?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { found.add(it) }
+            node.contentDescription?.toString()?.trim()?.takeIf { it.isNotBlank() && it !in found }?.let { found.add(it) }
+            for (i in 0 until node.childCount) walk(node.getChild(i))
+        }
+        walk(root)
+        return found.distinct().joinToString(". ").take(1200)
     }
 
     fun launchApp(packageName: String): Boolean {
