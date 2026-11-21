@@ -4,34 +4,29 @@ CyberDon is a native Android voice and device assistant powered by Google Gemini
 
 ## Key Features
 
-- **Siri / Gemini-Style Voice Bottom Sheet**: Slides up smoothly from the bottom of the screen with a futuristic cyber aesthetic. Pure voice-first design with `FLAG_NOT_FOCUSABLE` window configuration to ensure conflict-free microphone access and zero keyboard intrusion.
-- **Clean Screenshot Capture**: Automatically hides the CyberDon bottom sheet and floating bubble prior to screen capture, waits for surface compositor refresh, and restores the overlay after capture.
-- **Barge-in / Stop Speaking**: Tap the glowing Stop button or say "stop / chup / ruk jao" while CyberDon is speaking to instantly interrupt speech output (`tts.stop()`).
-- **Offline & Low-Network Resilient**:
-  - Full local device controls (torch, volume, battery, system navigation, screenshot, gestures) execute locally via Accessibility and system managers.
-  - Clear offline notifications without endless mic loops on network disconnect.
-- **Natural Conversation**:
-  - Direct, concise responses without repetitive name calling.
-- **Hardware & System Controls**:
-  - 🔦 **Torch / Flashlight**: Turn ON, OFF, or toggle.
-  - 🔋 **Battery**: Real-time capacity percentage.
-  - 🔊 **Audio**: Volume Up, Volume Down, Mute, Max Volume.
-  - 📸 **Screenshot**: Clean screen capture via Accessibility (Android 9+).
-  - 📱 **System Navigation**: Home, Back, Recent Apps, Notifications Shade, Quick Settings Toggles, Screen Lock.
-  - 📜 **Screen Text Reader**: Extracts visible text nodes from the active foreground window.
-  - ⚡ **Gestures**: Scroll Down and Scroll Up.
-  - 🚀 **Dynamic App Launcher**: Launches installed apps by label or package name (Free Fire, WhatsApp, YouTube, Instagram, Camera, Gallery, Settings, Chrome, etc.).
-  - 🔍 **YouTube & Web Search**: Direct query intents.
-  - 📳 **Vibration**: Haptic feedback.
-  - ⏰ **Clock & Calendar**: Live time, date, and day in Hindi/English.
+- **Direct Floating Voice Trigger**: A clean, draggable floating bubble (`CD 🎙`) that floats on top of any app. Tapping the bubble immediately activates speech recognition or stops speech.
+- **Clean Screenshot Capture**: Automatically hides the CyberDon floating bubble prior to screen capture, waits for surface compositor refresh, and restores the bubble after capture.
+- **Microphone Foreground Service**: Runs with `FOREGROUND_SERVICE_MICROPHONE` type for reliable microphone access on modern Android versions (Android 10 - 14+).
+- **Comprehensive Hardware & App Control**:
+  - Torch ON / OFF / Toggle via CameraManager
+  - Volume control (Up, Down, Max, Mute)
+  - Battery capacity readouts
+  - Current time and date
+  - Device vibration
+  - Screen navigation (Home, Back, Recents, Notifications, Quick Settings, Lock Screen)
+  - Accessibility scrolling (Swipe Up, Swipe Down)
+  - Screen text reading (`readVisibleText`)
+  - Direct app launching (Free Fire, WhatsApp, YouTube, Instagram, Camera, Gallery, Chrome, etc.)
+  - Split screen toggling
+  - In-app YouTube search
+  - Local device setting shortcuts (WiFi, Bluetooth, Display, Sound)
+- **Local Fallback**: If internet is unavailable or Gemini API encounters errors, essential device commands continue running locally.
 
 ## Setup Instructions
 
-1. Install `app-debug.apk` from GitHub Actions artifacts.
-2. Open CyberDon and grant the required permissions:
-   - **Microphone**: For voice command recognition.
-   - **Notifications**: For the persistent foreground session notification.
-   - **Accessibility Service**: Enables device control, gestures, and app launching.
-   - **Appear on Top (Overlay)**: Enables the Siri/Gemini-style bottom sheet and floating bubble.
-3. Save your Gemini API key inside the app settings (stored only locally in Encrypted/App SharedPreferences on your phone).
-4. (Optional) Set CyberDon as your **Default Digital Assistant** in Android Settings -> Default Apps -> Digital Assistant app.
+1. **Install APK**: Download `app-debug.apk` from the latest GitHub Actions build artifact.
+2. **Microphone Permission**: Allow microphone access when prompted.
+3. **Accessibility Service**: In phone Settings > Accessibility > Installed apps > Enable **CyberDon Assistant**.
+4. **Appear on Top Permission**: In phone Settings > Apps > Special app access > Appear on top > Enable **CyberDon**.
+5. **Gemini API Key**: Open the CyberDon app, tap "Set Gemini API Key", and enter your key (stored locally on your device).
+6. **Start Session**: Tap **Start hands-free voice session**. The floating bubble will appear on screen.

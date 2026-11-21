@@ -2,6 +2,8 @@ package com.cyberdon.assistant
 
 import android.app.*
 import android.content.*
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.AudioManager
@@ -10,6 +12,7 @@ import android.os.*
 import android.provider.Settings
 import android.speech.*
 import android.speech.tts.TextToSpeech
+import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -83,9 +86,18 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (!intentStarted) {
             try {
-                startForeground(NOTIFICATION_ID, notification())
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                } else {
+                    startForeground(NOTIFICATION_ID, notification())
+                }
                 intentStarted = true
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+                try {
+                    startForeground(NOTIFICATION_ID, notification())
+                    intentStarted = true
+                } catch (_: Exception) {}
+            }
         }
         when (intent?.action) {
             ACTION_STOP -> { stopSession(); return START_NOT_STICKY }
@@ -105,7 +117,7 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
             }
             ACTION_START -> {
                 startOverlayIfAllowed()
-                if (ttsReady) speakAndContinue("CyberDon ready hai. Command boliye.")
+                if (ttsReady) speakAndContinue("CyberDon ready hai. Bubble tap karke boliye.")
             }
         }
         return START_STICKY
@@ -122,60 +134,81 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
     private fun startListening() {
         if (listening) return
         stopSpeaking()
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            status("Speech recognition available nahi hai. Phone settings mein Google Voice/Speech check karein.", isSpeaking = false, isListening = false)
+
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            status("Microphone permission allow karein (Settings > Apps > CyberDon).", isSpeaking = false, isListening = false)
             return
         }
+
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            status("Speech recognition available nahi hai. Google Speech Services check karein.", isSpeaking = false, isListening = false)
+            return
+        }
+
         try {
-            recognizer?.destroy()
-            recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
-                setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        listening = true
-                        status("Sun raha hoon… Boliye.", isSpeaking = false, isListening = true)
-                    }
-                    override fun onBeginningOfSpeech() {
-                        status("Awaaz detect hui…", isSpeaking = false, isListening = true)
-                    }
-                    override fun onResults(results: Bundle?) {
-                        listening = false
-                        val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                        if (!text.isNullOrBlank()) {
-                            process(text)
-                        } else {
-                            status("Awaaz samajh nahi aayi. Dobara mic dabakar boliye.", isSpeaking = false, isListening = false)
-                        }
-                    }
-                    override fun onError(error: Int) {
-                        listening = false
-                        val errorMsg = when (error) {
-                            SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
-                                "Network offline hai. Local commands ke liye mic dabakar boliye."
-                            SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
-                                "Kuch sunai nahi diya. Mic dabakar dobara boliye."
-                            else -> "Mic idle ($error). Mic dabakar boliye ya type karein."
-                        }
-                        status(errorMsg, isSpeaking = false, isListening = false)
-                    }
-                    override fun onRmsChanged(rmsdB: Float) {}
-                    override fun onBufferReceived(buffer: ByteArray?) {}
-                    override fun onEndOfSpeech() {}
-                    override fun onPartialResults(partialResults: Bundle?) {}
-                    override fun onEvent(eventType: Int, params: Bundle?) {}
-                })
+            if (recognizer == null) {
+                recognizer = SpeechRecognizer.createSpeechRecognizer(this)
             }
+            recognizer?.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    listening = true
+                    status("Sun raha hoon… Boliye.", isSpeaking = false, isListening = true)
+                }
+                override fun onBeginningOfSpeech() {
+                    status("Awaaz detect hui…", isSpeaking = false, isListening = true)
+                }
+                override fun onResults(results: Bundle?) {
+                    listening = false
+                    val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (!text.isNullOrBlank()) {
+                        process(text)
+                    } else {
+                        status("Awaaz samajh nahi aayi. Bubble par tap karein.", isSpeaking = false, isListening = false)
+                    }
+                }
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (!text.isNullOrBlank()) {
+                        status("Suna: $text...", isSpeaking = false, isListening = true)
+                    }
+                }
+                override fun onError(error: Int) {
+                    listening = false
+                    val errorMsg = when (error) {
+                        SpeechRecognizer.ERROR_AUDIO -> "Audio error (3). Bubble par tap karein."
+                        SpeechRecognizer.ERROR_CLIENT -> "Client error (5). Bubble par tap karein."
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Mic permission error (9)."
+                        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network offline/timeout. Bubble tap karein."
+                        SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Kuch sunai nahi diya. Bubble par tap karke boliye."
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Mic busy tha. Dobara tap karein."
+                        else -> "Mic idle ($error). Bubble par tap karein."
+                    }
+                    status(errorMsg, isSpeaking = false, isListening = false)
+                }
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {
+                    listening = false
+                    status("Soch raha hoon…", isSpeaking = false, isListening = false)
+                }
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+
+            recognizer?.cancel()
             val speechIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 2)
-                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
             }
             recognizer?.startListening(speechIntent)
-        } catch (_: Exception) {
+            listening = true
+            status("Mic active hai… Boliye.", isSpeaking = false, isListening = true)
+        } catch (ex: Exception) {
             listening = false
-            status("Mic start nahi hua. Microphone permission check karein.", isSpeaking = false, isListening = false)
+            status("Mic start nahi hua: ${ex.message}", isSpeaking = false, isListening = false)
         }
     }
 
@@ -205,7 +238,7 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
                 while (history.size > 8) history.removeAt(0)
             }
 
-            status("Aap: $query\nCyberDon: $finalAnswer", isSpeaking = true, isListening = false)
+            status("CyberDon: $finalAnswer", isSpeaking = true, isListening = false)
             speakAndContinue(finalAnswer)
         }
     }
@@ -281,7 +314,7 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
                         try {
                             startService(Intent(this, FloatingOverlayService::class.java).setAction(FloatingOverlayService.ACTION_RESTORE_TEMPORARY))
                         } catch (_: Exception) {}
-                        results.add(if (ok) "Clean screenshot le liya (overlay hide karke)." else "Screenshot nahi le paya (Android 9+ required).")
+                        results.add(if (ok) "Clean screenshot le liya." else "Screenshot nahi le paya (Android 9+ required).")
                     }
                     "SPLIT_SCREEN" -> {
                         val ok = service?.toggleSplitScreen() == true

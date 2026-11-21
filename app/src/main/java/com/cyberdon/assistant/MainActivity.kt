@@ -46,9 +46,9 @@ class MainActivity : AppCompatActivity() {
 
         val hasOverlay = Settings.canDrawOverlays(this)
         binding.tvOverlayStatus.text = if (hasOverlay) {
-            "Appear on Top: ACTIVE (Siri/Gemini Bottom Sheet ready)"
+            "Appear on Top: ACTIVE (Floating CyberDon bubble ready)"
         } else {
-            "Appear on Top: NOT GRANTED (Required for Bottom Sheet)"
+            "Appear on Top: NOT GRANTED (Required for Floating Bubble)"
         }
     }
 
@@ -109,11 +109,11 @@ class MainActivity : AppCompatActivity() {
 
             if (Settings.canDrawOverlays(this)) {
                 startService(Intent(this, FloatingOverlayService::class.java).apply {
-                    action = FloatingOverlayService.ACTION_SHOW_BOTTOM_SHEET
+                    action = FloatingOverlayService.ACTION_START
                 })
             }
 
-            binding.tvOutput.text = "CyberDon active! Siri/Gemini-style Bottom Sheet screen ke neeche open hoga."
+            binding.tvOutput.text = "CyberDon active! Screen par floating bubble dikhega. Bubble par tap karke direct boliye."
         } catch (e: Exception) {
             binding.tvOutput.text = "Start error: ${e.localizedMessage ?: "Permissions check karein"}"
         }

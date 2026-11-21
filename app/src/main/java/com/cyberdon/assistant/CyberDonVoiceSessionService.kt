@@ -29,7 +29,7 @@ class CyberDonVoiceSession(context: Context) : VoiceInteractionSession(context) 
 
         try {
             context.startService(Intent(context, FloatingOverlayService::class.java).apply {
-                action = FloatingOverlayService.ACTION_SHOW_BOTTOM_SHEET
+                action = FloatingOverlayService.ACTION_START
             })
         } catch (_: Exception) {}
 
