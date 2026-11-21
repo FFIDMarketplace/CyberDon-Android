@@ -1,73 +1,357 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/hud_overlay_root"
-    android:layout_width="280dp"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp"
-    android:background="@drawable/bg_hud_overlay">
+    android:paddingStart="18dp"
+    android:paddingEnd="18dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="20dp"
+    android:background="@drawable/bg_bottom_sheet">
 
-    <TextView
-        android:id="@+id/tv_hud_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="CYBERDON // ONLINE"
-        android:textColor="#00F5FF"
-        android:textSize="11sp"
-        android:fontFamily="sans-serif-medium"
-        android:letterSpacing="0.1"
-        android:layout_marginBottom="12dp" />
+    <!-- Top Drag Handle -->
+    <View
+        android:layout_width="48dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="12dp"
+        android:background="#475569" />
 
-    <ProgressBar
-        android:id="@+id/progress_hud"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:progressTint="#00F5FF"
-        android:progressBackgroundTint="#21262D"
-        android:indeterminate="true"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/tv_hud_status"
+    <!-- Top Header -->
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Ali bhai, command boliye."
-        android:textColor="#F2F4F7"
-        android:textSize="14sp"
-        android:lineSpacingMultiplier="1.1" />
+        android:layout_marginBottom="10dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="end"
-        android:layout_marginTop="12dp">
-
-        <TextView
-            android:id="@+id/tv_hud_listen"
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:paddingLeft="12dp"
-            android:paddingRight="12dp"
-            android:gravity="center"
-            android:text="🎙 LISTEN"
-            android:textColor="#00F5FF"
-            android:textSize="12sp"
-            android:clickable="true"
-            android:focusable="true" />
+            android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <View
+                android:id="@+id/view_status_dot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="#00F5FF"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/tv_hud_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CYBERDON AI"
+                android:textColor="#00F5FF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1" />
+
+            <TextView
+                android:id="@+id/tv_hud_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="[READY]"
+                android:textColor="#94A3B8"
+                android:textSize="10sp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/tv_hud_close"
-            android:layout_width="wrap_content"
+            android:layout_width="36dp"
             android:layout_height="36dp"
-            android:paddingLeft="12dp"
-            android:paddingRight="12dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
             android:gravity="center"
-            android:text="CLOSE"
+            android:text="✕"
             android:textColor="#FF6B6B"
-            android:textSize="12sp"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true" />
+    </RelativeLayout>
+
+    <!-- Stop Speaking Banner (Visible only when Assistant is speaking) -->
+    <TextView
+        android:id="@+id/btn_stop_speaking"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginBottom="10dp"
+        android:gravity="center"
+        android:background="@drawable/bg_stop_btn"
+        android:text="⏹ STOP SPEAKING (Awaaz Roko)"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- Conversation / Status Display -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="160dp"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/tv_hud_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Command boliye ya neeche type karein..."
+            android:textColor="#F1F5F9"
+            android:textSize="14sp"
+            android:lineSpacingMultiplier="1.2" />
+    </ScrollView>
+
+    <!-- Quick Action Chips (Horizontal Scroll) -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:layout_marginBottom="14dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/chip_torch"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="🔦 Torch"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_battery"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="🔋 Battery"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_screenshot"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="📸 Screenshot"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_read_screen"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="📜 Read Screen"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_home"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="📱 Home"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_recents"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="⚡ Recents"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_scroll_down"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="⬇ Scroll Down"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_scroll_up"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="⬆ Scroll Up"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_vol_up"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="🔊 Vol +"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_vol_down"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="🔉 Vol -"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_mute"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="🔇 Mute"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:id="@+id/chip_notifications"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="8dp"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:gravity="center"
+                android:text="🔔 Notifications"
+                android:textColor="#E2E8F0"
+                android:textSize="12sp"
+                android:background="@drawable/bg_chip"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Bottom Controls: Input box + Send Button + Mic Button -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/et_hud_input"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input_box"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:hint="Command type karein..."
+            android:textColorHint="#64748B"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:imeOptions="actionSend"
+            android:inputType="text"
+            android:maxLines="1" />
+
+        <TextView
+            android:id="@+id/btn_hud_send"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:gravity="center"
+            android:text="➔"
+            android:textColor="#00F5FF"
+            android:textSize="18sp"
+            android:background="@drawable/bg_input_box"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/btn_hud_mic"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:gravity="center"
+            android:text="🎙 MIC"
+            android:textColor="#0A0E17"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:background="@drawable/bg_floating_bubble"
             android:clickable="true"
             android:focusable="true" />
     </LinearLayout>
+
 </LinearLayout>

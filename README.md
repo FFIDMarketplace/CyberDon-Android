@@ -1,29 +1,37 @@
-# CyberDon Android
+# CyberDon Android AI Assistant
 
-A user-started Android voice assistant prototype. It uses Android speech recognition and text-to-speech, Gemini for intent/answers when configured, and AccessibilityService only for explicitly requested visible UI actions.
+CyberDon is a native Android voice and device assistant powered by Google Gemini and native Android Accessibility & Hardware APIs.
 
-## What this build is intended to do
-- Start one visible foreground voice session from the app; after each response it listens again, so you do not need to reopen the app or tap the mic for every turn.
-- Show a persistent Android notification while the microphone session is active. Stop it with the notification's Stop action.
-- Offer a movable `CD` overlay bubble when Android's Appear on Top permission is granted. Tap it to show status/listen controls.
-- Keep basic commands available when Gemini is unavailable: launch a few named apps, YouTube search, battery percentage, vibration, home, visible-screen text, and vertical swipe gestures.
-- Report action requests separately from actions actually verified. App launch is checked against the active accessibility window; Android may still block or delay a requested action.
-- Keep the Gemini key in the app's local preferences. Never commit API keys to GitHub or send them in chat.
+## Key Features
 
-## Important limits
-- This is **not** a wake-word engine: it does not continuously detect “CyberDon” while stopped. Android does not permit a normal app to secretly keep the microphone open; the user must start the foreground voice session and see its notification. Speech recognition may use the phone's speech provider/network; offline speech recognition depends on the installed provider and language pack.
-- The session may be stopped by the user, Android, battery controls, permission changes, or manufacturer background limits. Keep CyberDon's notification visible and allow its background activity if the phone offers that setting.
-- Accessibility actions require the user to enable the CyberDon accessibility service. They do not grant unrestricted control. Secure screens, protected app content, some split-screen modes, Samsung-specific controls, calls, private messages, and camera/video contents are not promised.
-- Screen text is limited to visible text exposed by Android accessibility. It is not OCR or camera vision and may miss custom-drawn app content.
-- Network loss does not turn the app into a general offline AI. Only the documented basic command patterns have a local fallback; factual answers require the configured AI/network.
-- Build success proves compilation only. Test the APK on the target phone, permissions, each action, microphone privacy indicator, battery behavior, and speech provider before relying on it.
+- **Siri / Gemini-Style Bottom Sheet**: Slides up smoothly from the bottom of the screen with a futuristic cyber aesthetic, displaying real-time transcription, audio waveforms, quick action chips, and a text input box.
+- **Barge-in / Stop Speaking**: Tap the glowing Stop button or tap anywhere on the bottom sheet while CyberDon is speaking to instantly interrupt speech output (`tts.stop()`).
+- **Offline & Low-Network Resilient**:
+  - Full local device controls work 100% offline without internet.
+  - No endless mic looping on network drop: clearly indicates offline state and allows one-tap mic trigger or keyboard typing.
+- **Natural Conversation**:
+  - No repeated "Ali" prefixes or name spamming.
+  - Direct, concise responses without recitation of limitations unless explicitly requested.
+- **Rich Hardware & System Controls**:
+  - 🔦 **Torch / Flashlight**: Turn ON, OFF, or toggle.
+  - 🔋 **Battery**: Real-time capacity percentage and charging status.
+  - 🔊 **Audio**: Volume Up, Volume Down, Mute, Max Volume.
+  - 📸 **Screenshot**: Instant screen capture via Accessibility (Android 9+).
+  - 📱 **System Navigation**: Home, Back, Recent Apps, Notifications Shade, Quick Settings Toggles, Screen Lock.
+  - 📜 **Screen Text Reader**: Extracts visible text nodes from the active foreground window.
+  - ⚡ **Gestures**: Scroll Down (Swipe Up) and Scroll Up (Swipe Down).
+  - 🚀 **Dynamic App Launcher**: Launches any installed app by label or package name (Free Fire, WhatsApp, YouTube, Instagram, Camera, Gallery, Settings, Chrome, etc.).
+  - 🔍 **YouTube & Web Search**: Direct search query intents.
+  - 📳 **Vibration**: Haptic feedback.
+  - ⏰ **Clock & Calendar**: Live time, date, and day in Hindi/English.
 
-## Setup
-1. Install the APK and open CyberDon.
-2. Add your own Gemini API key in the app if you want AI answers. If an old key was posted publicly, revoke it at Google AI Studio and make a new one.
-3. Enable Accessibility from CyberDon's button. Grant Appear on Top if you want the floating bubble.
-4. Tap **Start hands-free voice session** and grant microphone/notification access. Keep the visible notification to keep the session active; tap **Stop** there to end it.
-5. Verify every action on the phone. Android prompts and app permissions remain under the user's control.
+## Setup Instructions
 
-## Build
-GitHub Actions runs `gradle assembleDebug` on pushes to `main` and manual workflow dispatches. The debug APK is an Actions artifact; it is not a signed Play Store release.
+1. Install `app-debug.apk` from GitHub Actions artifacts.
+2. Open CyberDon and grant the required permissions:
+   - **Microphone**: For voice command recognition.
+   - **Notifications**: For the persistent foreground session notification.
+   - **Accessibility Service**: Enables device control, gestures, and app launching.
+   - **Appear on Top (Overlay)**: Enables the Siri/Gemini-style bottom sheet and floating bubble.
+3. Save your Gemini API key inside the app settings (stored only locally on your phone).
+4. (Optional) Set CyberDon as your **Default Digital Assistant** in Android Settings -> Default Apps -> Digital Assistant app. Holding Home or swiping from the bottom corner will then trigger CyberDon.
