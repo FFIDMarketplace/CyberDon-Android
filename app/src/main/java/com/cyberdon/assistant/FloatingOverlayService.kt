@@ -1,7 +1,10 @@
 package com.cyberdon.assistant
 
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
@@ -11,8 +14,6 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.view.inputmethod.EditorInfo
-import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.abs
@@ -23,6 +24,8 @@ class FloatingOverlayService : Service() {
         const val ACTION_STOP = "com.cyberdon.assistant.STOP_OVERLAY"
         const val ACTION_STATUS = "com.cyberdon.assistant.STATUS"
         const val ACTION_SHOW_BOTTOM_SHEET = "com.cyberdon.assistant.SHOW_BOTTOM_SHEET"
+        const val ACTION_HIDE_TEMPORARY = "com.cyberdon.assistant.HIDE_TEMPORARY"
+        const val ACTION_RESTORE_TEMPORARY = "com.cyberdon.assistant.RESTORE_TEMPORARY"
         const val EXTRA_STATUS = "status"
         const val EXTRA_IS_SPEAKING = "is_speaking"
         const val EXTRA_IS_LISTENING = "is_listening"
@@ -32,13 +35,41 @@ class FloatingOverlayService : Service() {
     private var bubbleView: TextView? = null
     private var bottomSheetView: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
-    private var lastStatus = "Command boliye ya neeche type karein..."
+    private var lastStatus = "CyberDon ready hai. Boliye ya quick chips use karein."
     private var isSpeaking = false
     private var isListening = false
+
+    private val overlayReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                ACTION_HIDE_TEMPORARY -> setTemporaryVisibility(false)
+                ACTION_RESTORE_TEMPORARY -> setTemporaryVisibility(true)
+                ACTION_SHOW_BOTTOM_SHEET -> showBottomSheet()
+                ACTION_STATUS -> {
+                    lastStatus = intent.getStringExtra(EXTRA_STATUS) ?: lastStatus
+                    isSpeaking = intent.getBooleanExtra(EXTRA_IS_SPEAKING, isSpeaking)
+                    isListening = intent.getBooleanExtra(EXTRA_IS_LISTENING, isListening)
+                    updateUiState()
+                }
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        val filter = IntentFilter().apply {
+            addAction(ACTION_HIDE_TEMPORARY)
+            addAction(ACTION_RESTORE_TEMPORARY)
+            addAction(ACTION_SHOW_BOTTOM_SHEET)
+            addAction(ACTION_STATUS)
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(overlayReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(overlayReceiver, filter)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -46,6 +77,14 @@ class FloatingOverlayService : Service() {
             ACTION_STOP -> {
                 stopSelf()
                 return START_NOT_STICKY
+            }
+            ACTION_HIDE_TEMPORARY -> {
+                setTemporaryVisibility(false)
+                return START_STICKY
+            }
+            ACTION_RESTORE_TEMPORARY -> {
+                setTemporaryVisibility(true)
+                return START_STICKY
             }
             ACTION_SHOW_BOTTOM_SHEET -> {
                 showBottomSheet()
@@ -70,6 +109,12 @@ class FloatingOverlayService : Service() {
         return START_STICKY
     }
 
+    private fun setTemporaryVisibility(visible: Boolean) {
+        val visibility = if (visible) View.VISIBLE else View.GONE
+        bottomSheetView?.visibility = visibility
+        bubbleView?.visibility = visibility
+    }
+
     private fun showBubble() {
         if (bubbleView != null) return
         bubbleView = TextView(this).apply {
@@ -79,7 +124,10 @@ class FloatingOverlayService : Service() {
             gravity = Gravity.CENTER
             background = getDrawable(R.drawable.bg_floating_bubble)
             contentDescription = "CyberDon voice trigger"
-            setOnClickListener { showBottomSheet() }
+            setOnClickListener {
+                showBottomSheet()
+                sendListenRequest()
+            }
             setOnLongClickListener {
                 stopSelf()
                 true
@@ -145,6 +193,7 @@ class FloatingOverlayService : Service() {
 
     private fun showBottomSheet() {
         if (bottomSheetView != null) {
+            bottomSheetView?.visibility = View.VISIBLE
             updateUiState()
             return
         }
@@ -157,11 +206,12 @@ class FloatingOverlayService : Service() {
             WindowManager.LayoutParams.TYPE_PHONE
         }
 
+        // Crucial: FLAG_NOT_FOCUSABLE ensures window focus and audio/mic focus are NOT stolen or blocked
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             type,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.BOTTOM
@@ -169,17 +219,16 @@ class FloatingOverlayService : Service() {
             windowAnimations = android.R.style.Animation_InputMethod
         }
 
-        // Setup views
         val tvStatus = view.findViewById<TextView>(R.id.tv_hud_status)
         val tvClose = view.findViewById<TextView>(R.id.tv_hud_close)
         val btnStopSpeaking = view.findViewById<TextView>(R.id.btn_stop_speaking)
         val btnMic = view.findViewById<TextView>(R.id.btn_hud_mic)
-        val etInput = view.findViewById<EditText>(R.id.et_hud_input)
-        val btnSend = view.findViewById<TextView>(R.id.btn_hud_send)
+        val btnHide = view.findViewById<TextView>(R.id.btn_hud_hide)
 
         tvStatus.text = lastStatus
 
         tvClose.setOnClickListener { hideBottomSheet() }
+        btnHide.setOnClickListener { hideBottomSheet() }
 
         btnStopSpeaking.setOnClickListener {
             sendStopSpeaking()
@@ -193,35 +242,19 @@ class FloatingOverlayService : Service() {
             }
         }
 
-        fun sendTextCmd() {
-            val text = etInput.text.toString().trim()
-            if (text.isNotBlank()) {
-                sendTextCommand(text)
-                etInput.setText("")
-            }
-        }
-
-        btnSend.setOnClickListener { sendTextCmd() }
-        etInput.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEND || actionId == EditorInfo.IME_ACTION_DONE) {
-                sendTextCmd()
-                true
-            } else false
-        }
-
-        // Quick action chips
-        view.findViewById<TextView>(R.id.chip_torch)?.setOnClickListener { sendTextCommand("torch toggle") }
-        view.findViewById<TextView>(R.id.chip_battery)?.setOnClickListener { sendTextCommand("battery") }
-        view.findViewById<TextView>(R.id.chip_screenshot)?.setOnClickListener { sendTextCommand("screenshot") }
-        view.findViewById<TextView>(R.id.chip_read_screen)?.setOnClickListener { sendTextCommand("read screen") }
-        view.findViewById<TextView>(R.id.chip_home)?.setOnClickListener { sendTextCommand("home") }
-        view.findViewById<TextView>(R.id.chip_recents)?.setOnClickListener { sendTextCommand("recents") }
-        view.findViewById<TextView>(R.id.chip_scroll_down)?.setOnClickListener { sendTextCommand("scroll down") }
-        view.findViewById<TextView>(R.id.chip_scroll_up)?.setOnClickListener { sendTextCommand("scroll up") }
-        view.findViewById<TextView>(R.id.chip_vol_up)?.setOnClickListener { sendTextCommand("volume up") }
-        view.findViewById<TextView>(R.id.chip_vol_down)?.setOnClickListener { sendTextCommand("volume down") }
-        view.findViewById<TextView>(R.id.chip_mute)?.setOnClickListener { sendTextCommand("mute") }
-        view.findViewById<TextView>(R.id.chip_notifications)?.setOnClickListener { sendTextCommand("notifications") }
+        // Quick action chips (one-tap execution)
+        view.findViewById<TextView>(R.id.chip_torch)?.setOnClickListener { sendCommand("torch toggle") }
+        view.findViewById<TextView>(R.id.chip_battery)?.setOnClickListener { sendCommand("battery") }
+        view.findViewById<TextView>(R.id.chip_screenshot)?.setOnClickListener { sendCommand("screenshot") }
+        view.findViewById<TextView>(R.id.chip_read_screen)?.setOnClickListener { sendCommand("read screen") }
+        view.findViewById<TextView>(R.id.chip_home)?.setOnClickListener { sendCommand("home") }
+        view.findViewById<TextView>(R.id.chip_recents)?.setOnClickListener { sendCommand("recents") }
+        view.findViewById<TextView>(R.id.chip_scroll_down)?.setOnClickListener { sendCommand("scroll down") }
+        view.findViewById<TextView>(R.id.chip_scroll_up)?.setOnClickListener { sendCommand("scroll up") }
+        view.findViewById<TextView>(R.id.chip_vol_up)?.setOnClickListener { sendCommand("volume up") }
+        view.findViewById<TextView>(R.id.chip_vol_down)?.setOnClickListener { sendCommand("volume down") }
+        view.findViewById<TextView>(R.id.chip_mute)?.setOnClickListener { sendCommand("mute") }
+        view.findViewById<TextView>(R.id.chip_notifications)?.setOnClickListener { sendCommand("notifications") }
 
         bottomSheetView = view
         try {
@@ -244,23 +277,23 @@ class FloatingOverlayService : Service() {
 
         if (isSpeaking) {
             btnStopSpeaking?.visibility = View.VISIBLE
-            btnMic?.text = "⏹ STOP"
+            btnMic?.text = "⏹ STOP SPEAKING (Awaaz Roko)"
             btnMic?.setTextColor(0xFFFFFFFF.toInt())
-            btnMic?.background = getDrawable(R.drawable.bg_stop_btn)
+            btnMic?.background = getDrawable(R.drawable.bg_voice_mic_speaking)
             tvMode?.text = "[SPEAKING]"
             dot?.setBackgroundColor(0xFFFF3366.toInt())
         } else if (isListening) {
             btnStopSpeaking?.visibility = View.GONE
-            btnMic?.text = "● LISTENING"
+            btnMic?.text = "● SUN RAHA HOON… (Listening)"
             btnMic?.setTextColor(0xFF0A0E17.toInt())
-            btnMic?.background = getDrawable(R.drawable.bg_floating_bubble)
+            btnMic?.background = getDrawable(R.drawable.bg_voice_mic_listening)
             tvMode?.text = "[LISTENING]"
             dot?.setBackgroundColor(0xFF00F5FF.toInt())
         } else {
             btnStopSpeaking?.visibility = View.GONE
-            btnMic?.text = "🎙 MIC"
-            btnMic?.setTextColor(0xFF0A0E17.toInt())
-            btnMic?.background = getDrawable(R.drawable.bg_floating_bubble)
+            btnMic?.text = "🎙 TAP TO SPEAK (Boliye)"
+            btnMic?.setTextColor(0xFF00F5FF.toInt())
+            btnMic?.background = getDrawable(R.drawable.bg_voice_mic_idle)
             tvMode?.text = "[READY]"
             dot?.setBackgroundColor(0xFF00F5FF.toInt())
         }
@@ -291,7 +324,7 @@ class FloatingOverlayService : Service() {
         updateUiState()
     }
 
-    private fun sendTextCommand(cmd: String) {
+    private fun sendCommand(cmd: String) {
         val intent = Intent(CyberDonSessionService.ACTION_TEXT_COMMAND).setPackage(packageName).apply {
             putExtra(CyberDonSessionService.EXTRA_TEXT, cmd)
         }
@@ -305,6 +338,7 @@ class FloatingOverlayService : Service() {
     }
 
     override fun onDestroy() {
+        try { unregisterReceiver(overlayReceiver) } catch (_: Exception) {}
         hideBottomSheet()
         bubbleView?.let {
             try { windowManager.removeView(it) } catch (_: Exception) {}

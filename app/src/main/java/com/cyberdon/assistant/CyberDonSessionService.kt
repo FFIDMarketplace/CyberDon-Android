@@ -81,6 +81,12 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!intentStarted) {
+            try {
+                startForeground(NOTIFICATION_ID, notification())
+                intentStarted = true
+            } catch (_: Exception) {}
+        }
         when (intent?.action) {
             ACTION_STOP -> { stopSession(); return START_NOT_STICKY }
             ACTION_STOP_SPEAKING -> { stopSpeaking(); return START_STICKY }
@@ -98,10 +104,8 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
                 return START_STICKY
             }
             ACTION_START -> {
-                intentStarted = true
-                startForeground(NOTIFICATION_ID, notification())
                 startOverlayIfAllowed()
-                if (ttsReady) speakAndContinue("CyberDon ready hai. Command boliye ya type karein.")
+                if (ttsReady) speakAndContinue("CyberDon ready hai. Command boliye.")
             }
         }
         return START_STICKY
@@ -119,7 +123,7 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
         if (listening) return
         stopSpeaking()
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            status("Speech recognition available nahi hai. Neeche command type karein.", isSpeaking = false, isListening = false)
+            status("Speech recognition available nahi hai. Phone settings mein Google Voice/Speech check karein.", isSpeaking = false, isListening = false)
             return
         }
         try {
@@ -139,16 +143,16 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
                         if (!text.isNullOrBlank()) {
                             process(text)
                         } else {
-                            status("Awaaz samajh nahi aayi. Dobara mic dabayein ya type karein.", isSpeaking = false, isListening = false)
+                            status("Awaaz samajh nahi aayi. Dobara mic dabakar boliye.", isSpeaking = false, isListening = false)
                         }
                     }
                     override fun onError(error: Int) {
                         listening = false
                         val errorMsg = when (error) {
                             SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
-                                "Network offline hai. Mic dobara dabayein ya neeche command type karein."
+                                "Network offline hai. Local commands ke liye mic dabakar boliye."
                             SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
-                                "Kuch sunai nahi diya. Mic dabakar boliye ya type karein."
+                                "Kuch sunai nahi diya. Mic dabakar dobara boliye."
                             else -> "Mic idle ($error). Mic dabakar boliye ya type karein."
                         }
                         status(errorMsg, isSpeaking = false, isListening = false)
@@ -264,8 +268,20 @@ class CyberDonSessionService : Service(), TextToSpeech.OnInitListener {
                         if (ok) results.add("Screen locked.")
                     }
                     "TAKE_SCREENSHOT" -> {
+                        val hideIntent = Intent(FloatingOverlayService.ACTION_HIDE_TEMPORARY).setPackage(packageName)
+                        sendBroadcast(hideIntent)
+                        try {
+                            startService(Intent(this, FloatingOverlayService::class.java).setAction(FloatingOverlayService.ACTION_HIDE_TEMPORARY))
+                        } catch (_: Exception) {}
+                        delay(450)
                         val ok = service?.takeScreenshot() == true
-                        results.add(if (ok) "Screenshot le liya." else "Screenshot nahi le paya (Android 9+ required).")
+                        delay(450)
+                        val restoreIntent = Intent(FloatingOverlayService.ACTION_RESTORE_TEMPORARY).setPackage(packageName)
+                        sendBroadcast(restoreIntent)
+                        try {
+                            startService(Intent(this, FloatingOverlayService::class.java).setAction(FloatingOverlayService.ACTION_RESTORE_TEMPORARY))
+                        } catch (_: Exception) {}
+                        results.add(if (ok) "Clean screenshot le liya (overlay hide karke)." else "Screenshot nahi le paya (Android 9+ required).")
                     }
                     "SPLIT_SCREEN" -> {
                         val ok = service?.toggleSplitScreen() == true
