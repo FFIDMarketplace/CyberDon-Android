@@ -146,15 +146,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun handleUserInput(userSaid: String) {
-        binding.tvOutput.text = "Ali: "$userSaid"
-Thinking..."
+        binding.tvOutput.text = "Ali: $userSaid\nThinking..."
 
         lifecycleScope.launch {
             val (actions, reply) = geminiBrain.askCyberDon(userSaid, conversationHistory)
             conversationHistory.add(Pair(userSaid, reply))
-            binding.tvOutput.text = "Ali: "$userSaid"
-
-CyberDon: $reply"
+            binding.tvOutput.text = "Ali: $userSaid\n\nCyberDon: $reply"
 
             speak(reply)
             executeActions(actions)
